@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Lock, ShieldCheck, RefreshCcw, Copy, Sparkles, AlertCircle, Edit2 } from "lucide-react";
+import { Lock, ShieldCheck, RefreshCcw, Copy, Info, Sparkles, AlertCircle, Edit2 } from "lucide-react";
 import Share from "../components/share";
 
 const UPPER_MARK = "↑";
@@ -53,50 +53,124 @@ function decodeAlpha(text: string, key: string) {
 
 export default function Convertisseur() {
   const [mode, setMode] = useState<"normal" | "ultra">("normal");
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
-  const [myName, setMyName] = useState("");
-  const [partnerName, setPartnerName] = useState("");
-  const [isEncoded, setIsEncoded] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [messageInfo, setMessageInfo] = useState<{ text: string; type: "error" | "success" } | null>(null);
+const [input, setInput] = useState("");
+const [output, setOutput] = useState("");
+const [myName, setMyName] = useState("");
+const [partnerName, setPartnerName] = useState("");
+const [isEncoded, setIsEncoded] = useState(true);
+const [copied, setCopied] = useState(false);
+const [fade, setFade] = useState(false);
 
-  // Charger noms depuis localStorage au démarrage
-  useEffect(() => {
-    const savedMyName = localStorage.getItem("myName");
-    const savedPartnerName = localStorage.getItem("partnerName");
-    if (savedMyName) setMyName(savedMyName);
-    if (savedPartnerName) setPartnerName(savedPartnerName);
-  }, []);
+const [messageInfo, setMessageInfo] =
+  useState<{ text: string; type: "error" | "success" } | null>(null);
 
-  // Sauvegarder noms dans localStorage
-  useEffect(() => {
-    if (myName) localStorage.setItem("myName", myName);
-    if (partnerName) localStorage.setItem("partnerName", partnerName);
-  }, [myName, partnerName]);
+/* ===================== LOCAL STORAGE ===================== */
+useEffect(() => {
+  const savedMyName = localStorage.getItem("myName");
+  const savedPartnerName = localStorage.getItem("partnerName");
+  if (savedMyName) setMyName(savedMyName);
+  if (savedPartnerName) setPartnerName(savedPartnerName);
+}, []);
 
-  const handleConvert = () => {
-    setMessageInfo(null);
+useEffect(() => {
+  if (myName) localStorage.setItem("myName", myName);
+  if (partnerName) localStorage.setItem("partnerName", partnerName);
+}, [myName, partnerName]);
 
-    if (!myName.trim() || !partnerName.trim()) {
-      setMessageInfo({ text: "❌ Veuillez renseigner votre prénom et celui de votre ami(e).", type: "error" });
-      return;
-    }
-    if (!input.trim()) {
-      setMessageInfo({ text: "❌ Veuillez saisir un message à transformer.", type: "error" });
-      return;
-    }
+/* ===================== MODE ULTRA ===================== */
+const ULTRA_EMOJIS = ["😈","🔥","💀","🌟","⚡","🎯","💎","🛡️","🗝️","💥"];
 
+function xorEncryptUltra(text: string, key: string): string {
+  const encrypted = [...text]
+    .map((c, i) =>
+      String.fromCharCode(
+        c.charCodeAt(0) ^ key.charCodeAt(i % key.length)
+      )
+    )
+    .join("");
+
+  const base64 = btoa(encrypted);
+
+  return [...base64]
+    .map(c => c + ULTRA_EMOJIS[Math.floor(Math.random() * ULTRA_EMOJIS.length)])
+    .join("");
+}
+
+function xorDecryptUltra(encoded: string, key: string): string {
+  const cleaned = encoded.replace(new RegExp(ULTRA_EMOJIS.join("|"), "g"), "");
+  const decoded = atob(cleaned);
+
+  return [...decoded]
+    .map((c, i) =>
+      String.fromCharCode(
+        c.charCodeAt(0) ^ key.charCodeAt(i % key.length)
+      )
+    )
+    .join("");
+}
+
+/* ===================== CONVERSION ===================== */
+const handleConvert = () => {
+  setMessageInfo(null);
+
+  if (!myName.trim() || !partnerName.trim()) {
+    setMessageInfo({
+      text: "❌ Veuillez renseigner votre prénom et celui de votre ami(e).",
+      type: "error",
+    });
+    return;
+  }
+
+  if (!input.trim()) {
+    setMessageInfo({
+      text: "❌ Veuillez saisir un message à transformer.",
+      type: "error",
+    });
+    return;
+  }
+
+  try {
     let result = "";
+
     if (mode === "normal") {
-      result = isEncoded ? encodeAlpha(input, myName.trim()) : decodeAlpha(input, partnerName.trim());
-    } else {
-      result = "🔐 ███ ████ ████ ▓▓▓▓ ▓▓▓"; // Mode Ultra placeholder
+      result = isEncoded
+        ? encodeAlpha(input, myName.trim())
+        : decodeAlpha(input, partnerName.trim());
+    }
+
+    if (mode === "ultra") {
+      result = isEncoded
+        ? xorEncryptUltra(input, myName.trim())
+        : xorDecryptUltra(input, partnerName.trim());
     }
 
     setOutput(result);
     setMessageInfo({ text: "✔ Transformation réussie !", type: "success" });
-  };
+  } catch {
+    setMessageInfo({
+      text: "❌ Le message Ultra est invalide ou la clé est incorrecte.",
+      type: "error",
+    });
+  }
+};
+
+useEffect(() => {
+  if (!messageInfo) return;
+
+  // Démarrer le fade
+  setFade(true);
+
+  // Timer pour faire disparaître le message
+  const timer = setTimeout(() => {
+    setFade(false);           // commence le fade-out
+    setTimeout(() => setMessageInfo(null), 300); // enlève le message après fade
+  }, 3500);
+
+  return () => clearTimeout(timer);
+}, [messageInfo]);
+
+
+
 
   const handleCopy = async () => {
     if (!output) return;
@@ -142,16 +216,35 @@ export default function Convertisseur() {
             type="text"
             value={myName}
             onChange={e => setMyName(e.target.value)}
-            placeholder="🔑 Votre prénom"
+            placeholder="Votre prénom"
             className="w-full sm:w-1/2 p-3 rounded-xl bg-black/60 border border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none text-sm sm:text-base"
           />
           <input
             type="text"
             value={partnerName}
             onChange={e => setPartnerName(e.target.value)}
-            placeholder="👤 Prénom de l'ami(e)"
+            placeholder="Prénom de l'ami(e) 👤"
+
             className="w-full sm:w-1/2 p-3 rounded-xl bg-black/60 border border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none text-sm sm:text-base"
           />
+         {/* INFO PRÉNOM AMI */}
+<div className="flex items-center gap-2 text-xs sm:text-sm mb-4">
+  <button
+    type="button"
+    onClick={() =>
+      setMessageInfo({
+        text: "⚠️ IMPORTANT : pour décoder un message, le prénom de l’ami(e) doit être exactement le même que celui utilisé pour le coder.",
+        type: "error",
+      })
+    }
+    className="flex items-center gap-1 text-yellow-400 hover:text-yellow-300 transition font-semibold"
+  >
+    <AlertCircle size={14} />
+    Pourquoi ce prénom ?
+  </button>
+</div>
+
+
         </div>
 
         <button
@@ -162,15 +255,17 @@ export default function Convertisseur() {
         </button>
 
         {/* DIRECTION */}
-        <div className="flex justify-center mb-4">
-          <button
-            onClick={() => setIsEncoded(!isEncoded)}
-            className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white transition"
-          >
-            <RefreshCcw size={14} />
-            {isEncoded ? "Français → Code" : "Code → Français"}
-          </button>
-        </div>
+<div className="flex justify-center mb-4">
+  <button
+    onClick={() => setIsEncoded(!isEncoded)}
+    className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl
+               bg-gray-800 text-white hover:bg-gray-700 transition"
+  >
+    <RefreshCcw size={16} />
+    {isEncoded ? "Français → Code" : "Code → Français"}
+  </button>
+</div>
+
 
         {/* INPUT */}
         <textarea
@@ -190,11 +285,15 @@ export default function Convertisseur() {
 
         {/* MESSAGES D'INFO */}
         {messageInfo && (
-          <p className={`mt-3 text-center text-sm sm:text-base ${messageInfo.type === "error" ? "text-red-400" : "text-green-400"} flex justify-center items-center gap-2`}>
-            {messageInfo.type === "error" && <AlertCircle size={16} />}
-            {messageInfo.text}
-          </p>
-        )}
+  <p className={`mt-3 text-center text-sm sm:text-base 
+      ${messageInfo.type === "error" ? "text-red-400" : "text-green-400"} 
+      flex justify-center items-center gap-2
+      transition-opacity duration-300 ${fade ? "opacity-100" : "opacity-0"}`}>
+    {messageInfo.type === "error" && <AlertCircle size={16} />}
+    {messageInfo.text}
+  </p>
+)}
+
 
         {/* RESULTAT PROFESSIONNEL */}
 {output && (
@@ -217,15 +316,18 @@ export default function Convertisseur() {
 
 
         <Share
-  message={`🔐 Découvrez mon message secret !\n\n${output}\n\n💬 Relevez le défi et testez C'EST BLORRR 😈 ! Parlez en code, en toute discrétion.\n\n👉 Essayez-le ici :`}
+  message={`🔐 Hummm… regarde mon code secret 👀\n\n${output}\n\n💬 Relève le défi et teste C'EST BLORRR 😈 ! Parle en code, en toute discrétion.\n\n👉 Essaye-le ici :`}
   url="https://cestblorrr.vercel.app/convertisseur"
 />
 
 
 
+
         {mode === "ultra" && (
-          <p className="text-center text-red-400 text-xs sm:text-sm mt-4">⚠️ Mode Ultra : chiffrement fort (bientôt 🔐)</p>
-        )}
+          <p className="text-center text-red-400 text-xs sm:text-sm mt-4">
+  ⚠️ Mode Ultra : chiffrement avancé — version expérimentale.
+</p>
+ )}
       </div>
     </main>
   );
