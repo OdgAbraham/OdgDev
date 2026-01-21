@@ -36,7 +36,7 @@ const projects = [
       "Projet mobile innovant permettant de connecter facilement prestataires et clients pour des services fiables et rapides.",
     tags: ["Mobile App", "UX/UI", "Marketplace"],
     status: "Disponible",
-    link: "/apk/OnEstCalé_V1.0.0.apk"
+    link: "/apk/"
   },
   {
     title: "Infrastructure Backend",
