@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Lock, ShieldCheck, RefreshCcw, Copy, Sparkles, AlertCircle, Edit2 } from "lucide-react";
+import Share from "../components/share";
 
 const UPPER_MARK = "↑";
 
@@ -195,23 +196,32 @@ export default function Convertisseur() {
           </p>
         )}
 
-        {/* OUTPUT */}
-        <div className="relative mt-6">
-          <textarea
-            value={output}
-            readOnly
-            placeholder="Le code apparaîtra ici..."
-            className="w-full h-24 sm:h-28 p-4 rounded-2xl bg-black/60 border border-gray-700 text-indigo-300 font-mono text-sm sm:text-base resize-none"
-          />
-          {output && (
-            <button
-              onClick={handleCopy}
-              className="absolute top-3 right-3 text-gray-400 hover:text-white transition"
-            >
-              <Copy size={18} />
-            </button>
-          )}
-        </div>
+        {/* RESULTAT PROFESSIONNEL */}
+{output && (
+  <div className="mt-6 p-6 bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 rounded-3xl shadow-2xl border border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fadeIn">
+    <div className="flex-1 break-words text-indigo-100 font-mono text-sm sm:text-base">
+      {output}
+    </div>
+
+    <div className="flex gap-3 mt-3 sm:mt-0">
+      <button
+        onClick={handleCopy}
+        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm flex items-center gap-2 transition"
+      >
+        <Copy size={16} /> Copier
+      </button>
+
+    </div>
+  </div>
+)}
+
+
+        <Share
+  message={`🔐 Découvrez mon message secret !\n\n${output}\n\n💬 Relevez le défi et testez C'EST BLORRR 😈 ! Parlez en code, en toute discrétion.\n\n👉 Essayez-le ici :`}
+  url="https://cestblorrr.vercel.app/convertisseur"
+/>
+
+
 
         {mode === "ultra" && (
           <p className="text-center text-red-400 text-xs sm:text-sm mt-4">⚠️ Mode Ultra : chiffrement fort (bientôt 🔐)</p>
