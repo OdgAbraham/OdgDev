@@ -276,7 +276,7 @@ useEffect(() => {
       <div className="w-full max-w-md sm:max-w-3xl bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
 {/* BOUTON RETOUR */}
 <button
-  onClick={() => navigate(-1)}
+  onClick={() => navigate("/")}
   className="mb-4 flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
 >
 <LogOut size={16} /> Sortie
