@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Lock, ShieldCheck, RefreshCcw, Copy, Info, Sparkles, AlertCircle, Edit2 } from "lucide-react";
+import { Lock, ShieldCheck, RefreshCcw, Copy, LogOut, Sparkles, AlertCircle, Edit2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 import Share from "../components/share";
 
 const UPPER_MARK = "↑";
@@ -16,40 +18,68 @@ function generateAlphaMapFromKey(key: string) {
   return map;
 }
 
+const ESCAPE = "§";
+
+function isAlpha(char: string) {
+  return char.toLowerCase() >= "a" && char.toLowerCase() <= "z";
+}
+
+
 function encodeAlpha(text: string, key: string) {
   const alphaMap = generateAlphaMapFromKey(key.toLowerCase());
-  return [...text]
-    .map((char) => {
-      if (char === " ") return "   ";
+
+  return [...text].map((char) => {
+    if (char === " ") return "   ";
+
+    // 🔒 lettres uniquement
+    if (isAlpha(char)) {
       const isUpper = char >= "A" && char <= "Z";
       const lower = char.toLowerCase();
-      if (alphaMap[lower]) {
-        const encoded = alphaMap[lower];
-        return isUpper ? UPPER_MARK + encoded : encoded;
-      }
-      return char;
-    })
-    .join("");
+      const encoded = alphaMap[lower];
+      return isUpper ? UPPER_MARK + encoded : encoded;
+    }
+
+    // 🛡️ tout le reste est protégé
+    return ESCAPE + char;
+  }).join("");
 }
+
 
 function decodeAlpha(text: string, key: string) {
   const alphaMap = generateAlphaMapFromKey(key.toLowerCase());
   const reverse = Object.fromEntries(
     Object.entries(alphaMap).map(([k, v]) => [v, k])
   );
+
   let result = "";
   let upperNext = false;
+  let escapeNext = false;
+
   for (const char of [...text]) {
+    if (escapeNext) {
+      result += char;     // restaure le caractère original
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === ESCAPE) {
+      escapeNext = true;
+      continue;
+    }
+
     if (char === UPPER_MARK) {
       upperNext = true;
       continue;
     }
+
     const decoded = reverse[char] ?? char;
     result += upperNext ? decoded.toUpperCase() : decoded;
     upperNext = false;
   }
+
   return result;
 }
+
 
 export default function Convertisseur() {
   const [mode, setMode] = useState<"normal" | "ultra">("normal");
@@ -60,6 +90,7 @@ const [partnerName, setPartnerName] = useState("");
 const [isEncoded, setIsEncoded] = useState(true);
 const [copied, setCopied] = useState(false);
 const [fade, setFade] = useState(false);
+const navigate = useNavigate();
 
 const [messageInfo, setMessageInfo] =
   useState<{ text: string; type: "error" | "success" } | null>(null);
@@ -78,36 +109,96 @@ useEffect(() => {
 }, [myName, partnerName]);
 
 /* ===================== MODE ULTRA ===================== */
-const ULTRA_EMOJIS = ["😈","🔥","💀","🌟","⚡","🎯","💎","🛡️","🗝️","💥"];
+const ULTRA_EMOJIS = ["😈","🔥","💀","🛡️","🗝️","💥"];
 
-function xorEncryptUltra(text: string, key: string): string {
-  const encrypted = [...text]
-    .map((c, i) =>
-      String.fromCharCode(
-        c.charCodeAt(0) ^ key.charCodeAt(i % key.length)
-      )
+function base64EncodeUtf8(str: string): string {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16))
     )
-    .join("");
+  );
+}
 
-  const base64 = btoa(encrypted);
+function base64DecodeUtf8(str: string): string {
+  return decodeURIComponent(
+    atob(str)
+      .split("")
+      .map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
 
+
+const ESCAPE = "§";
+
+function escapeText(text: string): string {
+  return [...text].map(c => {
+    if (/[a-zA-Z0-9 ]/.test(c)) return c;
+    return ESCAPE + c;
+  }).join("");
+}
+
+function unescapeText(text: string): string {
+  let result = "";
+  let escapeNext = false;
+
+  for (const c of [...text]) {
+    if (escapeNext) {
+      result += c;
+      escapeNext = false;
+      continue;
+    }
+    if (c === ESCAPE) {
+      escapeNext = true;
+      continue;
+    }
+    result += c;
+  }
+
+  return result;
+}
+
+
+function xorEncryptUltraSafe(text: string, key: string): string {
+  if (!key) throw new Error("Clé vide");
+
+  // 1️⃣ Escape les caractères spéciaux
+  const escaped = escapeText(text);
+
+  // 2️⃣ Transformer en code points pour éviter btoa problème Unicode
+  const bytes = new Uint8Array([...escaped].map((c, i) => c.charCodeAt(0) ^ key.charCodeAt(i % key.length)));
+
+  // 3️⃣ Base64 safe
+  let binary = "";
+  for (let b of bytes) binary += String.fromCharCode(b);
+  const base64 = btoa(binary);
+
+  // 4️⃣ Camouflage emoji
   return [...base64]
     .map(c => c + ULTRA_EMOJIS[Math.floor(Math.random() * ULTRA_EMOJIS.length)])
     .join("");
 }
 
-function xorDecryptUltra(encoded: string, key: string): string {
-  const cleaned = encoded.replace(new RegExp(ULTRA_EMOJIS.join("|"), "g"), "");
-  const decoded = atob(cleaned);
+function xorDecryptUltraSafe(encoded: string, key: string): string {
+  if (!key) throw new Error("Clé vide");
 
-  return [...decoded]
-    .map((c, i) =>
-      String.fromCharCode(
-        c.charCodeAt(0) ^ key.charCodeAt(i % key.length)
-      )
-    )
-    .join("");
+  // 1️⃣ Nettoyage emojis
+  const cleaned = encoded.replace(new RegExp(ULTRA_EMOJIS.join("|"), "g"), "");
+
+  // 2️⃣ Base64 decode
+  const binary = atob(cleaned);
+
+  // 3️⃣ XOR inverse
+  const bytes = new Uint8Array([...binary].map((c, i) => c.charCodeAt(0) ^ key.charCodeAt(i % key.length)));
+
+  // 4️⃣ Reconstituer le texte
+  const decrypted = String.fromCharCode(...bytes);
+
+  // 5️⃣ Unescape
+  return unescapeText(decrypted);
 }
+
+
 
 /* ===================== CONVERSION ===================== */
 const handleConvert = () => {
@@ -140,8 +231,8 @@ const handleConvert = () => {
 
     if (mode === "ultra") {
       result = isEncoded
-        ? xorEncryptUltra(input, myName.trim())
-        : xorDecryptUltra(input, partnerName.trim());
+        ? xorEncryptUltraSafe(input, myName.trim())
+        : xorDecryptUltraSafe(input, partnerName.trim());
     }
 
     setOutput(result);
@@ -183,6 +274,13 @@ useEffect(() => {
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-950 via-black to-gray-950 text-white px-4 sm:px-6 py-12 flex items-center justify-center">
       <div className="w-full max-w-md sm:max-w-3xl bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+{/* BOUTON RETOUR */}
+<button
+  onClick={() => navigate(-1)}
+  className="mb-4 flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
+>
+<LogOut size={16} /> Sortie
+</button>
 
         {/* HEADER */}
         <div className="text-center mb-6 sm:mb-8">
@@ -191,7 +289,7 @@ useEffect(() => {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wide">C'EST BLORR !</h1>
             <Sparkles className="text-indigo-400 animate-pulse" />
           </div>
-          <p className="text-gray-400 text-xs sm:text-sm">Cache tes mots • Parle en code 😈</p>
+          <p className="text-gray-400 text-xs sm:text-sm">Fait bien ton gbêrê et proprement 😈</p>
         </div>
 
         {/* MODE SWITCH */}
@@ -247,12 +345,7 @@ useEffect(() => {
 
         </div>
 
-        <button
-          onClick={() => setPartnerName("")}
-          className="mb-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 w-full sm:w-auto"
-        >
-          <Edit2 size={16} /> Changer le prénom de l'ami(e)
-        </button>
+       
 
         {/* DIRECTION */}
 <div className="flex justify-center mb-4">
@@ -315,8 +408,13 @@ useEffect(() => {
 )}
 
 
-        <Share
-  message={`🔐 Hummm… regarde mon code secret 👀\n\n${output}\n\n💬 Relève le défi et teste C'EST BLORRR 😈 ! Parle en code, en toute discrétion.\n\n👉 Essaye-le ici :`}
+<Share
+  message={`🔐 Hummm… est-ce que tu peux lire ce que j'ai écrit ? 👀 :
+    \n\n${output}\n\n
+Alors envoie-moi un gbêrê codé !! On va se gbêrêtiser aujourd'hui 😈
+
+💬 Relève le défi et teste C'EST BLORRR ! Parle en code, en toute discrétion.
+👉 Essaye-le ici :`}
   url="https://cestblorrr.vercel.app/convertisseur"
 />
 
@@ -328,7 +426,10 @@ useEffect(() => {
   ⚠️ Mode Ultra : chiffrement avancé — version expérimentale.
 </p>
  )}
+ 
       </div>
+      
     </main>
+
   );
 }
