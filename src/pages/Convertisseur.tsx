@@ -407,20 +407,6 @@ useEffect(() => {
   </div>
 )}
 
-
-<Share
-  message={`🔐 Hummm… est-ce que tu peux lire ce que j'ai écrit ? 👀 :
-    \n\n${output}\n\n
-Alors envoie-moi un gbêrê codé !! On va se gbêrêtiser aujourd'hui 😈
-
-💬 Relève le défi et teste C'EST BLORRR ! Parle en code, en toute discrétion.
-👉 Essaye-le ici :`}
-  url="https://cestblorrr.vercel.app/convertisseur"
-/>
-
-
-
-
         {mode === "ultra" && (
           <p className="text-center text-red-400 text-xs sm:text-sm mt-4">
   ⚠️ Mode Ultra : chiffrement avancé — version expérimentale.
